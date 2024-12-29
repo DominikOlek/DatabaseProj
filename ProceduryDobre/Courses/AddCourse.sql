@@ -1,28 +1,30 @@
-CREATE PROCEDURE [dbo].AddNewCourse
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE PROCEDURE AddNewCourse
 	@CourseID int = NULL,
     @Title NVARCHAR(50)= NULL,
     @Description NVARCHAR(MAX) = NULL,
     @StartDate datetime,
 	@EndDate datetime,
-    @Price decimal(8,2)
+    @Price decimal(8,2),
+	@Status varchar(10) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
 
 	BEGIN TRY
-        -- Rozpoczêcie transakcji
         BEGIN TRANSACTION;
 
 		IF @CourseID IS NULL AND @Title IS NULL
 		BEGIN
-			PRINT 'Wrong data, give title or id.';
-			RETURN;
+			raiserror('Musisz podaæ tytu³ lub ID Kursu.', 16, 1);
 		END
 
-		IF @StartDate>@EndDate OR @StartDate<GETDATE()
+		IF @StartDate>@EndDate OR @EndDate < GETDATE()
 		BEGIN
-			PRINT 'Wrong datatime';
-			RETURN;
+			raiserror('Data nie jest w poprawnym zakresie.', 16, 1);
 		END
 
 		IF @CourseID IS NOT NULL AND EXISTS (SELECT 1 FROM Courses WHERE Course_ID = @CourseID)
@@ -37,12 +39,12 @@ BEGIN
 			END
 
 			INSERT INTO CourseVersions(
-				StartDate,EndDate,Price
+				StartDate,EndDate,Price,Available,Status
 			)
 			VALUES (
-				@StartDate,@EndDate,@Price
+				@StartDate,@EndDate,@Price,1,@Status
 			);
-			PRINT 'CourseVersion already exists.';
+			PRINT 'Wersja kursu zosta³a dodana.';
 			RETURN;
 		END
 
@@ -55,12 +57,12 @@ BEGIN
 
 
 		INSERT INTO CourseVersions(
-			Course_ID,StartDate,EndDate,Price
+			Course_ID,StartDate,EndDate,Price,Available,Status
 		)
 		VALUES (
-			SCOPE_IDENTITY(),@StartDate,@EndDate,@Price
+			SCOPE_IDENTITY(),@StartDate,@EndDate,@Price,1,@Status
 		);
-		PRINT 'CourseVersion already exists.';
+		PRINT 'Wersja kursu i Kurs zosta³y dodane.';
 
         COMMIT TRANSACTION;
     END TRY

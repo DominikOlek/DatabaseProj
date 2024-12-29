@@ -1,5 +1,9 @@
-CREATE PROCEDURE [dbo].AddModulsToCourse
-	@CourseID int,
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE PROCEDURE AddModuleToCourse
+@CourseID int,
     @Title NVARCHAR(50),
     @Description NVARCHAR(MAX) = NULL,
     @DateOf datetime,
@@ -10,55 +14,63 @@ CREATE PROCEDURE [dbo].AddModulsToCourse
     @Room NVARCHAR(10) = NULL,
 	@Limit int = NULL,
 	@ExpireDate date = NULL,
-    @TeacherL_ID int,
-    @Translator_ID int = NULL
+    @MainTeacher_ID int
 AS
 BEGIN
     SET NOCOUNT ON;
 
 	BEGIN TRY
-        -- Rozpoczêcie transakcji
         BEGIN TRANSACTION;
 
 		IF @ISONLINEASYNC =1 AND @ISONLINESYNC =1
 		BEGIN
-			PRINT 'Wrong data.';
-			RETURN;
+			raiserror('Spotkanie nie mo¿e byæ asnychroniczne i synchroniczne jednoczeœnie.', 16, 1);
 		END
 
 		IF @CourseID IS NULL OR NOT EXISTS (SELECT 1 FROM Courses WHERE Course_ID = @CourseID)
 		BEGIN
-			PRINT 'Wrong data.';
-			RETURN;
+			raiserror('Nie istnieje kurs o takim ID.', 16, 1);
 		END
 
-		IF @TeacherL_ID IS NULL OR NOT EXISTS (SELECT 1 FROM TeachersLanguage WHERE TeacherLanguage_ID = @TeacherL_ID)
+		IF @MainTeacher_ID IS NULL OR NOT EXISTS (SELECT * FROM TeachersLanguage where TeacherLanguage_ID = @MainTeacher_ID)
 		BEGIN
-			PRINT 'Wrong teacher.';
-			RETURN;
+			raiserror('Nie istnieje nauczyciel o takim ID.', 16, 1);
 		END
+
+		DECLARE @RoleID int;
+		IF NOT EXISTS (SELECT Role_ID from Roles where RoleName = 'leading')
+		BEGIN
+			INSERT INTO Roles(RoleName) values('leading');
+		END
+		SELECT @RoleID = Role_ID from Roles where RoleName = 'leading';
 
 		IF @DateOf<GETDATE() OR @DateOf > (select EndDate from CourseVersions WHERE CourseVersion_ID = @CourseID) OR @DateOf <(select StartDate from CourseVersions WHERE CourseVersion_ID = @CourseID)
 		BEGIN
-			PRINT 'Wrong datatime';
-			RETURN;
+			raiserror('Data nie jest w poprawnym zakresie.', 16, 1);
 		END
 
 		INSERT INTO Moduls(
-			DateOf,Description,Title,TeacherLanguage_ID,Translator_ID
+			DateOf,Description,Title
 		)
 		VALUES (
-			@DateOf,@Description,@Title,@TeacherL_ID,@Translator_ID
+			@DateOf,@Description,@Title
 		);
 
 		DECLARE @ModulID int;
 		SELECT @ModulID = SCOPE_IDENTITY();
 
+		INSERT INTO TeachersForModul(
+			Teacher_ID, Modul_ID,Role_ID
+		)
+		VALUES (
+			@MainTeacher_ID,@ModulID,@RoleID
+		);
+
 		IF @ISOFFLINE = 1
 		BEGIN
 			IF @Room IS NULL
 			BEGIN
-				RAISERROR('Error, no room', 16, 1);
+				raiserror('Nie podano numeru pokoju.', 16, 1);
 			END
 
 			INSERT INTO StationaryModulsC(
@@ -73,12 +85,12 @@ BEGIN
 		BEGIN
 			IF @Link IS NULL or @ExpireDate IS NULL
 			BEGIN
-				RAISERROR('Error, no data', 16, 1);
+				raiserror('Nie podano daty wygaœniêcia.', 16, 1);
 			END
 
 			IF @ExpireDate < @DateOf
 			BEGIN
-				RAISERROR('Error, dataof is latter than expire', 16, 1);
+				raiserror('Data nie jest w poprawnym zakresie.', 16, 1);
 			END
 
 			INSERT INTO RemoteModulsUnSynchronize(
@@ -93,7 +105,7 @@ BEGIN
 		BEGIN
 			IF @Link IS NULL
 			BEGIN
-				RAISERROR('Error, no data', 16, 1);
+				raiserror('Nie podano linku do modu³u.', 16, 1);
 			END
 
 			INSERT INTO RemoteModulsSynchronize(
@@ -104,7 +116,7 @@ BEGIN
 			);
 		END
 
-		PRINT 'CourseModul already exists.';
+		PRINT 'Modu³ kursu zosta³ utworzony pomyœlnie.';
 
         COMMIT TRANSACTION;
     END TRY
@@ -118,3 +130,4 @@ BEGIN
         RAISERROR(@ErrorMessage, @ErrorSeverity, @ErrorState);
     END CATCH;
 END;
+

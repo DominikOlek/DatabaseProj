@@ -1,14 +1,32 @@
+-- ================================================
+-- Template generated from Template Explorer using:
+-- Create Procedure (New Menu).SQL
+--
+-- Use the Specify Values for Template Parameters 
+-- command (Ctrl-Shift-M) to fill in the parameter 
+-- values below.
+--
+-- This block of comments will not be included in
+-- the definition of the procedure.
+-- ================================================
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+-- =============================================
+-- Author:		<Author,,Name>
+-- Create date: <Create Date,,>
+-- Description:	<Description,,>
+-- =============================================
 CREATE PROCEDURE EditModul
-	@ModulID int,
+@ModulID int,
     @Title NVARCHAR(50) = NULL,
     @Description NVARCHAR(MAX) = NULL,
     @DateOf datetime = NULL,
     @Link NVARCHAR(100) = NULL,
     @Room NVARCHAR(10) = NULL,
 	@Limit int = NULL,
-	@ExpireDate date = NULL,
-    @TeacherL_ID int = NULL,
-    @Translator_ID int = NULL
+	@ExpireDate date = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -19,32 +37,22 @@ BEGIN
 
 		IF @ModulID IS NULL OR NOT EXISTS (SELECT 1 FROM Moduls WHERE Modul_ID = @ModulID)
 		BEGIN
-			PRINT 'Wrong data.';
-			RETURN;
+			raiserror('Modul o podanym ID nie istnieje.', 16, 1);
 		END
 
 		DECLARE @CourseID int;
 		SELECT @CourseID = (SELECT CourseVersion_ID FROM Moduls WHERE Modul_ID = @ModulID);
 
-		IF @TeacherL_ID IS NOT NULL AND NOT EXISTS (SELECT 1 FROM TeachersLanguage WHERE TeacherLanguage_ID = @TeacherL_ID)
-		BEGIN
-			PRINT 'Wrong teacher.';
-			RETURN;
-		END
-
 		IF @DateOf IS NOT NULL AND (@DateOf<GETDATE() OR @DateOf > (select EndDate from CourseVersions WHERE CourseVersion_ID = @CourseID) OR @DateOf <(select StartDate from CourseVersions WHERE CourseVersion_ID = @CourseID))
 		BEGIN
-			PRINT 'Wrong datatime';
-			RETURN;
+			raiserror('Data modulu nie jest w zakresie.', 16, 1);
 		END
 
 		UPDATE Moduls
 		SET 
 			Title = ISNULL(@Title, Title),
 			Description = ISNULL(@Description, Description),
-			DateOf = ISNULL(@DateOf, DateOf),
-			TeacherLanguage_ID = ISNULL(@TeacherL_ID, TeacherLanguage_ID),
-			Translator_ID = ISNULL(@Translator_ID, Translator_ID)
+			DateOf = ISNULL(@DateOf, DateOf)
 		WHERE Modul_ID = @ModulID;
 
 
@@ -61,7 +69,7 @@ BEGIN
 		BEGIN
 			IF @ExpireDate IS NOT NULL AND @DateOf IS NOT NULL AND @ExpireDate < @DateOf
 			BEGIN
-				RAISERROR('Error, dataof is latter than expire', 16, 1);
+				raiserror('Data modulu nie jest w zakresie.', 16, 1);
 			END
 
 			UPDATE RemoteModulsUnSynchronize
@@ -79,7 +87,7 @@ BEGIN
 			WHERE Modul_ID = @ModulID;
 		END
 
-		PRINT 'CourseModul already change.';
+		PRINT 'CourseModul zosta³ zmieniony.';
 
         COMMIT TRANSACTION;
     END TRY

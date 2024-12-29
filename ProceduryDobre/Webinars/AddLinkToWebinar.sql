@@ -9,5 +9,7 @@ BEGIN
     SET 
         Link = @Link
     WHERE Webinar_ID = @WebinarID;
+
+	PRINT 'Dodano link spotkania pomyœlnie.';
 END
 GO
