@@ -5,7 +5,7 @@ GO
 CREATE PROCEDURE InitalizeStudyYear
 	@StudyName_ID int,
 	@Price decimal(8,2),
-	@StartYear varchar(9)
+	@StartYear date
 AS
 BEGIN
 	SET NOCOUNT ON;
